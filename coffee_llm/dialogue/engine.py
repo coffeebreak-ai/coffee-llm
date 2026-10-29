@@ -15,8 +15,8 @@ from coffee_llm.constants import (
     ASSISTANT_TOOL,
     ESCALATE_TOOL,
 )
-from coffee_llm.deflate import deflate_text
-from coffee_llm.expert import advance_expert, clear_expert_request
+from coffee_llm.dialogue.deflate import deflate_text
+from coffee_llm.dialogue.expert import advance_expert, clear_expert_request
 from coffee_llm.limits import COMPACT_EVIDENCE_CHAR_BUDGET, COMPACT_PACKET_CHAR_BUDGET
 RESERVED_TOOLS = {"gateway_assistant", "assistant_needs_expert", "gateway_writer", "writer_needs_cloud"}
 PAUSE = "Запрос сохранён. Отправьте сообщение ещё раз."

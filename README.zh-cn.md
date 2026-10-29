@@ -79,6 +79,10 @@ flowchart TD
 
 助手子对话结束后，专家收到的是一份结构化结果，而不是每一步。不超过 12 000 个字符的片段原样通过。更长的由 `deflate_adjastor` 处理：保留开头、保留结尾，或者看不清时把文本交给不带工具的 `deflator` 挑选片段。完整结果可按 `source_id` 取得。外部调用不删除，仍然交回客户端。
 
+## 仓库结构
+
+对话编排集中在 `coffee_llm/dialogue/`：`engine.py` 管理对话状态和路由，`expert.py`、`helper.py`、`packet.py` 与 `deflate.py` 实现相关流程。顶层的 `coffee_llm/expert.py`、`helper.py`、`packet.py` 和 `deflate.py` 保留为显式兼容导出。入口 `coffee_llm/__main__.py` 保持原位。
+
 ## 指标
 
 测于 2026 年 10 月 29 日。这些运行的角色：专家和「仅专家」是 `gpt-6.1-sol`，力度 `medium`；助手是 `gpt-6-luna`，力度 `medium`；调整器和 `deflate_adjastor` 是 `jev-latest`；`deflator` 是 `gpt-6-luna`。调整器和压缩的令牌不在表中。指标很少，已算出的都在下面：输入和缓存。节省只保留输入的百分比：「仅专家」减去「专家」。

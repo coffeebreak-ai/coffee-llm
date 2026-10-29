@@ -79,6 +79,10 @@ For a new dialogue with `COMPACT_EXPERT_CONTEXT=on`, the helper prepares the pac
 
 After the helper's subdialogue the expert receives one structured result, not every step. A fragment of up to 12,000 characters passes through whole. A longer one is examined by `deflate_adjastor`: keep the start, keep the end, or, if it is unclear, pass the text to `deflator` to select excerpts without tools. The full result is available by `source_id`. External calls are not removed and are still returned to the client.
 
+## Repository structure
+
+Dialogue orchestration is grouped in `coffee_llm/dialogue/`: `engine.py` owns dialogue state and routing, with `expert.py`, `helper.py`, `packet.py`, and `deflate.py` implementing the supporting flows. The top-level `coffee_llm/expert.py`, `helper.py`, `packet.py`, and `deflate.py` remain explicit compatibility exports. The `coffee_llm/__main__.py` entry point stays in place.
+
 ## Metrics
 
 Measured on 29 October 2026. Roles in these runs: the expert and the expert-only run — `gpt-6.1-sol`, effort `medium`; the assistant — `gpt-6-luna`, effort `medium`; the adjuster and `deflate_adjastor` — `jev-latest`; `deflator` — `gpt-6-luna`. Adjuster and compression tokens are not in the tables. There are few metrics; the ones counted are below: input and cache. Savings is only the input percentage: expert-only minus the expert.
