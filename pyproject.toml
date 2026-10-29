@@ -1,0 +1,7 @@
+[project]
+name = "coffee_llm"
+version = "0.0.0"
+description = "Coffee LLM"
+readme = "README.md"
+requires-python = ">=3.15"
+dependencies = []
