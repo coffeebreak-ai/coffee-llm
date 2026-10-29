@@ -8,7 +8,7 @@
 [![задачи](https://img.shields.io/github/issues/coffeebreak-ai/coffee-llm)](https://github.com/coffeebreak-ai/coffee-llm/issues)
 [![запросы на слияние](https://img.shields.io/github/issues-pr/coffeebreak-ai/coffee-llm)](https://github.com/coffeebreak-ai/coffee-llm/pulls)
 
-Личный шлюз перед дорогой моделью. В Cursor модель называется `Coffee LLM`. В коде и командах без пробела имя `coffee_llm`. Человек говорит с одним адресом, а шлюз решает, кто ведёт ход: ассистент собирает данные, эксперт судит и отвечает.
+Личный шлюз перед дорогой моделью. В Cursor и Codex модель называется `Coffee LLM`. В коде и командах без пробела имя `coffee_llm`. Человек говорит с одним адресом, а шлюз решает, кто ведёт ход: ассистент собирает данные, эксперт судит и отвечает.
 
 ## Миссия
 
@@ -120,6 +120,21 @@ ngrok http 8080
 ```
 
 В Cursor задайте OpenAI-compatible Base URL: https-адрес, который напечатал ngrok, с `/v1` на конце. Выберите модель `Coffee LLM`. ngrok только доставляет запрос на локальный шлюз. Порты MCP и Graphiti в туннель не направляйте.
+
+Codex на этой же машине читает `~/.codex/config.toml`, а не `config.yaml`. Укажите шлюз и полностью закройте Codex, затем откройте снова:
+
+```toml
+model = "Coffee LLM"
+model_provider = "coffee"
+
+[model_providers.coffee]
+name = "Coffee LLM"
+base_url = "http://127.0.0.1:8080/v1"
+wire_api = "responses"
+requires_openai_auth = false
+```
+
+Если Codex на другой машине, в `base_url` поставьте https-адрес ngrok с `/v1`.
 
 Graphiti необязательна: шлюз работает и с ней, и без неё. Пошаговый разбор Open WebUI ведётся локально и в этот репозиторий не входит. Все ключи хранятся только в локальном `.env`; он и `data/` исключены из Git.
 

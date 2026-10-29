@@ -43,6 +43,19 @@ def chat_needs_responses(payload):
     return False
 
 
+def distinct_items(items):
+    seen = set()
+    unique = []
+    for item in items or []:
+        ident = item.get("id") if isinstance(item, dict) else None
+        if ident and ident in seen:
+            continue
+        if ident:
+            seen.add(ident)
+        unique.append(item)
+    return unique
+
+
 def chat_input(messages):
     items = []
     for message in messages or []:

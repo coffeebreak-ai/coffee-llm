@@ -8,7 +8,7 @@
 [![issues](https://img.shields.io/github/issues/coffeebreak-ai/coffee-llm)](https://github.com/coffeebreak-ai/coffee-llm/issues)
 [![pull requests](https://img.shields.io/github/issues-pr/coffeebreak-ai/coffee-llm)](https://github.com/coffeebreak-ai/coffee-llm/pulls)
 
-A personal gateway in front of an expensive model. In Cursor the model is named `Coffee LLM`. In code and commands the name without a space is `coffee_llm`. The person talks to one address, and the gateway decides who leads the turn: the assistant gathers data, the expert judges and answers.
+A personal gateway in front of an expensive model. In Cursor and Codex the model is named `Coffee LLM`. In code and commands the name without a space is `coffee_llm`. The person talks to one address, and the gateway decides who leads the turn: the assistant gathers data, the expert judges and answers.
 
 ## Mission
 
@@ -120,6 +120,21 @@ ngrok http 8080
 ```
 
 In Cursor, set the OpenAI-compatible Base URL to the https address ngrok prints, with `/v1` at the end. Select the model `Coffee LLM`. ngrok only delivers the request to the local gateway. Do not point the tunnel at the MCP or Graphiti ports.
+
+Codex on the same machine reads `~/.codex/config.toml`, not `config.yaml`. Point it at the gateway, then fully quit and reopen Codex:
+
+```toml
+model = "Coffee LLM"
+model_provider = "coffee"
+
+[model_providers.coffee]
+name = "Coffee LLM"
+base_url = "http://127.0.0.1:8080/v1"
+wire_api = "responses"
+requires_openai_auth = false
+```
+
+If Codex is on another machine, use the ngrok https address with `/v1` as `base_url`.
 
 Graphiti is optional: the gateway works with it and without it. The step-by-step notes for Open WebUI are kept locally and are not part of this repository. All keys live only in the local `.env`; it and `data/` are excluded from Git.
 

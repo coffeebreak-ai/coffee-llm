@@ -8,7 +8,7 @@
 [![议题](https://img.shields.io/github/issues/coffeebreak-ai/coffee-llm)](https://github.com/coffeebreak-ai/coffee-llm/issues)
 [![拉取请求](https://img.shields.io/github/issues-pr/coffeebreak-ai/coffee-llm)](https://github.com/coffeebreak-ai/coffee-llm/pulls)
 
-这是放在昂贵模型前面的个人网关。在 Cursor 中模型名叫 `Coffee LLM`。代码和命令里不带空格的名字是 `coffee_llm`。人只对着一个地址说话，由网关决定这一步谁来主导：助手收集数据，专家判断并回答。
+这是放在昂贵模型前面的个人网关。在 Cursor 和 Codex 中模型名叫 `Coffee LLM`。代码和命令里不带空格的名字是 `coffee_llm`。人只对着一个地址说话，由网关决定这一步谁来主导：助手收集数据，专家判断并回答。
 
 ## 使命
 
@@ -120,6 +120,21 @@ ngrok http 8080
 ```
 
 在 Cursor 中把 OpenAI 兼容的 Base URL 设为 ngrok 打印出的 https 地址，并在末尾加上 `/v1`。选择模型 `Coffee LLM`。ngrok 只把请求送到本机网关。不要把隧道指向 MCP 或 Graphiti 端口。
+
+同一台机器上的 Codex 读取 `~/.codex/config.toml`，不读取 `config.yaml`。指向网关后，完全退出并重新打开 Codex：
+
+```toml
+model = "Coffee LLM"
+model_provider = "coffee"
+
+[model_providers.coffee]
+name = "Coffee LLM"
+base_url = "http://127.0.0.1:8080/v1"
+wire_api = "responses"
+requires_openai_auth = false
+```
+
+如果 Codex 在另一台机器上，把 `base_url` 设为 ngrok 的 https 地址，并在末尾加上 `/v1`。
 
 Graphiti 是可选的：网关有它能工作，没有它也能工作。Open WebUI 的分步说明留在本地，不进入这个仓库。所有密钥只放在本地 `.env`；它和 `data/` 不进入 Git。
 

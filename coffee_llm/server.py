@@ -4,6 +4,7 @@ import json
 import threading
 import time
 import urllib.error
+import uuid
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from coffee_llm.constants import ASSISTANT_INSTRUCTION
@@ -11,7 +12,7 @@ from coffee_llm.dialogue import DialogueEngine, DialogueStore, session_scope
 from coffee_llm.metrics import continue_comparison
 from coffee_llm.limits import MAX_GATEWAY_TURNS, MAX_REQUEST_BYTES, OPENAI_TIMEOUT_SECONDS
 from coffee_llm.openai import (
-    chat_input, chat_tools, prepare_expert_body, responses_as_chat, responses_request,
+    chat_input, chat_tools, distinct_items, prepare_expert_body, responses_as_chat, responses_request,
     usage_note, usage_record,
 )
 from coffee_llm.traffic import TrafficLog
@@ -46,13 +47,39 @@ def response_tools(payload, endpoint):
     if endpoint == "chat":
         tools = chat_tools(payload.get("tools"))
     else:
-        tools = payload.get("tools", [])
-    return [copy.deepcopy(t) for t in tools if t.get("name") not in ("gateway_assistant", "assistant_needs_expert")]
+        tools = payload.get("tools") or []
+    return [copy.deepcopy(tool) for tool in flatten_tools(tools)]
+
+
+def flatten_tools(tools):
+    flat = []
+    for tool in tools or []:
+        if not isinstance(tool, dict):
+            continue
+        if tool.get("name") in ("gateway_assistant", "assistant_needs_expert"):
+            continue
+        if tool.get("type") == "namespace":
+            flat.extend(flatten_tools(tool.get("tools") or []))
+            continue
+        flat.append(tool)
+    return flat
+
+
+def assistant_catalog(tools):
+    catalog = []
+    for tool in tools:
+        if not isinstance(tool, dict):
+            continue
+        if tool.get("type") not in (None, "function"):
+            catalog.append(tool)
+            continue
+        catalog.append({"type": "function", "function": {key: value for key, value in tool.items() if key != "type"}})
+    return catalog
 
 
 def chat_messages(items):
     messages = []
-    for item in items:
+    for item in distinct_items(items):
         kind = item.get("type")
         if kind == "function_call":
             messages.append({"role": "assistant", "content": None, "tool_calls": [{
@@ -79,7 +106,12 @@ def assistant_items(message):
 
 
 def render_response(items, endpoint, stream):
-    payload = {"object": "response", "status": "completed", "output": items}
+    payload = {
+        "id": "resp_" + uuid.uuid4().hex,
+        "object": "response",
+        "status": "completed",
+        "output": items,
+    }
     if endpoint == "chat":
         return responses_as_chat(payload, stream)
     if not stream:
@@ -152,21 +184,31 @@ class Gateway:
 def request_handler(gateway):
     class Handler(BaseHTTPRequestHandler):
         def _send(self, status, content_type, body):
-            self.send_response(status)
-            self.send_header("Content-Type", content_type)
-            self.send_header("Content-Length", str(len(body)))
-            self.end_headers()
-            self.wfile.write(body)
+            try:
+                self.send_response(status)
+                self.send_header("Content-Type", content_type)
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+            except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
+                self._client_closed()
 
         def _error(self, status, message, headers=None):
             body = json.dumps({"error": {"message": message}}).encode()
-            self.send_response(status)
-            self.send_header("Content-Type", "application/json")
-            self.send_header("Content-Length", str(len(body)))
-            for name, value in (headers or {}).items():
-                self.send_header(name, str(value))
-            self.end_headers()
-            self.wfile.write(body)
+            try:
+                self.send_response(status)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(body)))
+                for name, value in (headers or {}).items():
+                    self.send_header(name, str(value))
+                self.end_headers()
+                self.wfile.write(body)
+            except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
+                self._client_closed()
+
+        def _client_closed(self):
+            path = (self.path or "/").split("?", 1)[0]
+            gateway.traffic.access("POST", path, "closed", "client disconnected")
 
         def _model_log(self, who, status, note=""):
             gateway.traffic.access("POST", "/v1/responses", status, note, log_role(who))
@@ -187,6 +229,7 @@ def request_handler(gateway):
                 gateway._usage_local.bucket = None
 
         def _expert(self, items, tools, request_id="", model=None, effort=None):
+            items = distinct_items(items)
             request_model = model or gateway.model
             request_effort = effort or gateway.effort
             body = prepare_expert_body({"input": items, "tools": tools, "stream": False},
@@ -217,11 +260,19 @@ def request_handler(gateway):
                 return [{"type": "function_call", "name": "assistant_needs_expert", "call_id": "assistant_unavailable",
                          "arguments": '{"reason":"assistant is not configured"}'}]
             messages = [{"role": "system", "content": ASSISTANT_INSTRUCTION}, *chat_messages(items)]
-            requested_tools = [{"type": "function", "function": {k: v for k, v in t.items() if k != "type"}}
-                               for t in tools]
+            requested_tools = assistant_catalog(tools)
             started = time.perf_counter()
             try:
                 result = gateway.assistant(messages, requested_tools, request_id)
+            except urllib.error.HTTPError as error:
+                detail = ""
+                try:
+                    body = json.loads(error.read().decode())
+                    detail = str((body.get("error") or {}).get("message") or "")[:300]
+                except (ValueError, TypeError, AttributeError):
+                    detail = ""
+                self._model_log("assistant", "error", ("HTTP " + str(error.code) + " " + detail).strip())
+                raise
             except Exception as error:
                 self._model_log("assistant", "error", type(error).__name__)
                 raise
@@ -331,6 +382,8 @@ def request_handler(gateway):
                 if retry_after is not None and not gateway.proxy:
                     message = "Лимит частоты поставщика. Запрос сохранён, отправьте сообщение ещё раз."
                 self._error(error.code, message, headers)
+            except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
+                self._client_closed()
             except (OSError, RuntimeError, TimeoutError) as error:
                 self._error(502, "Model request failed: " + type(error).__name__)
 
